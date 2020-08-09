@@ -22,6 +22,5 @@ pipenv run jupyter lab
 ```
 
 Depois, escolha o kernel `jupyter-venv`.
-```
 ![image](https://user-images.githubusercontent.com/7110169/89743040-3ad25080-da97-11ea-9213-b5ac3657dd44.png)
-```
+
