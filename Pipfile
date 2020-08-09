@@ -14,6 +14,8 @@ matplotlib = "*"
 soundfile = "*"
 imageio = "*"
 ipywidgets = "*"
+jupyterlab = "*"
+librosa = "*"
 
 [requires]
 python_version = "3.8"
