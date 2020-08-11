@@ -1,0 +1,141 @@
+import io
+import os
+import math as m
+import numpy as np
+from urllib.request import urlopen
+import scipy.io.wavfile as wavfile
+import ctypes
+import soundfile as sf
+import librosa
+from common.noisereduce import reduce_noise
+
+
+def load_file(filename):
+    return librosa.load(filename)
+
+
+def preprocess_audio(y, sr):
+    """
+        Preprocess an audio file: centralizes audio at y=0 and adjusts
+        amplitude to [-1, 1].
+    """
+    # Librosa already adjusts it to us.
+    # sample_depth = 8*y[0].itemsize
+    y = y[:] - np.mean(y)
+    # y = y / (2**(sample_depth - 1))
+
+
+def sliding_window_energy(y, sr, window_size=4096):
+    """
+        Calculates the mean energy (in dB) of the signal in sliding windows.
+        returns the mean energy edB and its minimum value.
+    """
+    y2 = np.power(y, 2)
+    window = np.ones(window_size) / float(window_size)
+    # decibel calculation.
+    edB = 10 * np.log10(np.convolve(y2, window))[window_size - 1:]
+    # we throw away the initial and ending 0.5s, because the sliding windows
+    # are not correct in the initial/final borders.
+    imin = int(0.5 * sr)
+    edBmin = min(edB[imin:-imin])
+    edB = np.maximum(edB, edBmin)
+    return edB, edBmin
+
+
+def boolean_majority_filter(y, window_size):
+    """
+        Applies a majority filter boolean vectors
+        over windows of size 2 * window_size + 1 
+    """
+    y_out = y.copy()
+
+    # we initalize the sentry as N True values. This makes the edges of the sound be considered as
+    # noise more often, which is more common anyway.
+    y_pad = np.concatenate(
+        (np.ones(window_size), y, np.ones(window_size + 1)))
+
+    n_true = 0
+    n_false = 0
+
+    for i in range(2 * window_size + 1):
+        n_true += int(y_pad[i])
+        n_false += int(not y_pad[i])
+
+    for i in range(len(y_out)):
+        # Every index is the majority vote of the window y[i-window_size : i+window_size + 1]
+        # containing 2 * window_size + 1 elements.
+        # that corresponds to indexes y_pad[i:i + 2 * window_size + 1]
+        y_out[i] = n_true > n_false
+
+        if i >= window_size:
+            to_remove = y_out[i - window_size]
+        else:  # remove one "True" that we padded.
+            to_remove = y_pad[i]
+
+        if to_remove:
+            n_true -= 1
+        else:
+            n_false -= 1
+
+        # gets the new vote and includes it.
+        if y_pad[i + 2 * window_size + 1]:
+            n_true += 1
+        else:
+            n_false += 1
+
+    return y_out
+
+
+def noise_sel(y, sr, noise_threshold=6, eliminate_noise_bigger_than_seconds=0.2):
+    edB, edBmin = sliding_window_energy(y, sr)
+
+    # select frames with RMS mean next to the minimum level
+    inoise_pre = edB < edBmin + noise_threshold
+
+    inoise = boolean_majority_filter(inoise_pre, int(
+        eliminate_noise_bigger_than_seconds * sr))
+
+    return inoise, inoise_pre
+
+
+def noise_reduce_signal(y, sr):
+    inoise, _ = noise_sel(y, sr)
+    noise = y[inoise]
+
+    reduced_y, ε = reduce_noise(audio_clip=y,
+                                noise_clip=noise, 
+                                n_grad_freq=3,
+                                n_grad_time=3, 
+                                n_std_thresh=2, 
+                                prop_decrease=1.0, 
+                                verbose=False)
+
+    # Normalize to [-1, 1]
+    reduced_y /= max(max(y),-min(y),1)
+    ε /= max(max(ε),-min(ε),1)
+
+    return reduced_y, ε
+
+
+def process_signal_file(filename, save_to):
+    y, sr = load_file(filename)
+    reduced_y, _ = noise_reduce_signal(y, sr)
+    sf.write(save_to, y, sr)
+
+def main(argv):
+    from pathlib import Path
+    for search_path in argv[1:]:
+        just_name = search_path.split('.')[0]
+        if Path(search_path).is_file:
+            process_signal_file(search_path, f'{just_name}.cleaned.wav')
+            continue
+        for path in Path(search_path).rglob('*'):
+            if not path.is_file():
+                continue
+            process_signal_file(search_path, f'{just_name}.cleaned.wav')
+
+    
+
+if __name__ == '__main__':
+    from sys import argv
+    main(argv)
