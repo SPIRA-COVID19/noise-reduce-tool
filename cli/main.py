@@ -32,14 +32,22 @@ def sliding_window_energy(y, sr, window_size=4096):
     """
     y2 = np.power(y, 2)
     window = np.ones(window_size) / float(window_size)
+
     # decibel calculation.
-    edB = 10 * np.log10(np.convolve(y2, window))[window_size - 1:]
+    # Some borders of the convolution may have zeroes on them, and that
+    # makes taking log10 especially hard. We'll ignore them and leave them zero.
+    convolution = np.convolve(y2, window)
+    edB = 10 * np.log10(convolution, where=convolution > 0)[window_size - 1:]
+
     # we throw away the initial and ending 0.5s, because the sliding windows
     # are not correct in the initial/final borders.
     imin = int(0.5 * sr)
-    edBmin = min(edB[imin:-imin])
+
+    edBmin = np.min(edB[imin:-imin])
+    edBmax = np.max(edB[imin:-imin])
     edB = np.maximum(edB, edBmin)
-    return edB, edBmin
+
+    return edB, edBmin, edBmax
 
 
 def boolean_majority_filter(y, window_size):
@@ -86,8 +94,14 @@ def boolean_majority_filter(y, window_size):
     return y_out
 
 
-def noise_sel(y, sr, noise_threshold=6, eliminate_noise_bigger_than_seconds=0.2):
-    edB, edBmin = sliding_window_energy(y, sr)
+def noise_sel(y, sr, noise_threshold: float = None, eliminate_noise_bigger_than_seconds: float = 0.2):
+    edB, edBmin, edBmax = sliding_window_energy(y, sr)
+
+    if noise_threshold is None:
+        # Crude heuristic: anything below 27% of the "mean dB"
+        # is considered noise.
+        noise_threshold = 0.27 * (edBmax - edBmin)
+
 
     # select frames with RMS mean next to the minimum level
     inoise_pre = edB < edBmin + noise_threshold
@@ -120,7 +134,7 @@ def noise_reduce_signal(y, sr):
 def process_signal_file(filename, save_to):
     y, sr = load_file(filename)
     reduced_y, _ = noise_reduce_signal(y, sr)
-    sf.write(save_to, y, sr)
+    sf.write(save_to, reduced_y, sr)
 
 def main(argv):
     from pathlib import Path
