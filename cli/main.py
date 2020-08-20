@@ -149,6 +149,7 @@ def main(argv):
 
     output_path = argv[1].rstrip('/')
     makedirs(output_path, exist_ok=True)
+
     for search_path in argv[2:]:
         if Path(search_path).is_file():
             just_name = str(search_path.relative_to(search_path)).split('.')[0]
@@ -158,7 +159,6 @@ def main(argv):
         for path in Path(search_path).rglob('*'):
             if any(x in str(path) for x in IGNORED_PATHS):
                 continue
-            print(f'{path=} isfile={path.is_file()}')
             if not path.is_file():
                 continue
             just_name = str(path.relative_to(search_path)).split('.')[0]
