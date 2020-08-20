@@ -152,8 +152,9 @@ def main(argv):
 
     for search_path in argv[2:]:
         if Path(search_path).is_file():
-            just_name = str(search_path.relative_to(search_path)).split('.')[0]
-            process_signal_file(search_path, f'{output_path}/{just_name}.cleaned.wav')
+            just_name = str(Path(search_path).relative_to(search_path)).split('.')[0]
+            makedirs(Path(output_path) / Path(search_path).relative_to(search_path))
+            process_signal_file(search_path, f'{output_path}/{just_name}.cleaned.wav', exist_ok=True)
             print(f'processed {search_path}')
             continue
         for path in Path(search_path).rglob('*'):
@@ -162,6 +163,7 @@ def main(argv):
             if not path.is_file():
                 continue
             just_name = str(path.relative_to(search_path)).split('.')[0]
+            makedirs(Path(output_path) / Path(search_path).relative_to(search_path), exist_ok=True)
             process_signal_file(path, f'{output_path}/{just_name}.cleaned.wav')
             print(f'processed {path}')
 
