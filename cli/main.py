@@ -138,18 +138,35 @@ def process_signal_file(filename, save_to):
 
 def main(argv):
     from pathlib import Path
-    for search_path in argv[1:]:
-        just_name = search_path.split('.')[0]
-        if Path(search_path).is_file:
-            process_signal_file(search_path, f'{just_name}.cleaned.wav')
+    from os import makedirs
+
+    IGNORED_PATHS = ['.DS_Store', '.asd']
+
+    if len(argv) < 3: 
+        print(f'usage: {argv[0]} <location_to_be_saved> <file/dir> [ <file/dir> ... ]')
+        print(f'Cleans all noise from audio in all file/dirs in the input.')
+        return -1
+
+    output_path = argv[1].rstrip('/')
+    makedirs(output_path, exist_ok=True)
+    for search_path in argv[2:]:
+        if Path(search_path).is_file():
+            just_name = str(search_path.relative_to(search_path)).split('.')[0]
+            process_signal_file(search_path, f'{output_path}/{just_name}.cleaned.wav')
+            print(f'processed {search_path}')
             continue
         for path in Path(search_path).rglob('*'):
+            if any(x in str(path) for x in IGNORED_PATHS):
+                continue
+            print(f'{path=} isfile={path.is_file()}')
             if not path.is_file():
                 continue
-            process_signal_file(search_path, f'{just_name}.cleaned.wav')
+            just_name = str(path.relative_to(search_path)).split('.')[0]
+            process_signal_file(path, f'{output_path}/{just_name}.cleaned.wav')
+            print(f'processed {path}')
 
     
 
 if __name__ == '__main__':
-    from sys import argv
-    main(argv)
+    from sys import argv, exit
+    exit(main(argv))
