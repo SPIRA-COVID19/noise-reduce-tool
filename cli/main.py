@@ -113,6 +113,11 @@ def noise_sel(y, sr, noise_threshold: float = None, eliminate_noise_bigger_than_
 
 
 def noise_reduce_signal(y, sr):
+    # We can only work with audios longer than 1 second, because
+    # we will throw away
+    if len(y) <= sr * 1:
+        return y, np.zeros(len(y))
+
     inoise, _ = noise_sel(y, sr)
     noise = y[inoise]
 
@@ -163,7 +168,7 @@ def main(argv):
             if not path.is_file():
                 continue
             just_name = str(path.relative_to(search_path)).split('.')[0]
-            makedirs(Path(output_path) / Path(search_path).relative_to(search_path), exist_ok=True)
+            makedirs(Path(output_path) / Path(path).relative_to(search_path), exist_ok=True)
             process_signal_file(path, f'{output_path}/{just_name}.cleaned.wav')
             print(f'processed {path}')
 
