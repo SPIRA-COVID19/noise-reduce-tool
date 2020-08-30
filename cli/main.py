@@ -156,12 +156,15 @@ def just_crop_ends(y, sr):
 
 
 def process_signal_file(filename, save_to, noise_supress=True):
-    y, sr = load_file(filename)
-    if noise_supress:
-        reduced_y, _ = noise_reduce_signal(y, sr)
-    else:
-        reduced_y = just_crop_ends(y, sr)
-    sf.write(save_to, reduced_y, sr)
+    try:
+        y, sr = load_file(filename)
+        if noise_supress:
+            reduced_y, _ = noise_reduce_signal(y, sr)
+        else:
+            reduced_y = just_crop_ends(y, sr)
+        sf.write(save_to, reduced_y, sr)
+    except:
+        print(f'error processing {filename}, skipping')
 
 def main(argv):
     from pathlib import Path
