@@ -111,10 +111,20 @@ def noise_sel(y, sr, noise_threshold: float = None, eliminate_noise_bigger_than_
 
     return inoise, inoise_pre
 
+def cut_noise_from_edges(y, inoise):
+    '''
+    Cuts all the noise from the beginning and end of the signal.
+    this is made using the indices of inoise.
+    '''
+    # noise = True, signal = False. It returns rows and columns, we just want the rows.
+    isignal, *_ = np.where(inoise == False)
+    first_signal, last_signal = isignal[0], isignal[-1]
+
+    return y[first_signal:last_signal]
 
 def noise_reduce_signal(y, sr):
     # We can only work with audios longer than 1 second, because
-    # we will throw away
+    # we will throw away at least 0.5s off of each side
     if len(y) <= sr * 1:
         return y, np.zeros(len(y))
 
@@ -129,16 +139,28 @@ def noise_reduce_signal(y, sr):
                                 prop_decrease=1.0, 
                                 verbose=False)
 
+    reduced_y = cut_noise_from_edges(reduced_y, inoise)
+
     # Normalize to [-1, 1]
     reduced_y /= max(max(y),-min(y),1)
     ε /= max(max(ε),-min(ε),1)
 
     return reduced_y, ε
 
+def just_crop_ends(y, sr):
+    if len(y) <= sr * 1:
+        return y
+    
+    inoise, _ = noise_sel(y, sr)
+    return cut_noise_from_edges(y, inoise)
 
-def process_signal_file(filename, save_to):
+
+def process_signal_file(filename, save_to, noise_supress=True):
     y, sr = load_file(filename)
-    reduced_y, _ = noise_reduce_signal(y, sr)
+    if noise_supress:
+        reduced_y, _ = noise_reduce_signal(y, sr)
+    else:
+        reduced_y = just_crop_ends(y, sr)
     sf.write(save_to, reduced_y, sr)
 
 def main(argv):
@@ -147,19 +169,26 @@ def main(argv):
 
     IGNORED_PATHS = ['.DS_Store', '.asd']
 
-    if len(argv) < 3: 
+    if len(argv) < 3:
         print(f'usage: {argv[0]} <location_to_be_saved> <file/dir> [ <file/dir> ... ]')
         print(f'Cleans all noise from audio in all file/dirs in the input.')
         return -1
+
+    # I'll make it in a cleaner way afterwards
+    no_noise_supression = False
+    if '--no-noise-supression' in argv:
+        index_of_no_noise_supression_flag = argv.index('--no-noise-supression')
+        no_noise_supression = True
+        argv.pop(index_of_no_noise_supression_flag)
 
     output_path = argv[1].rstrip('/')
     makedirs(output_path, exist_ok=True)
 
     for search_path in argv[2:]:
         if Path(search_path).is_file():
-            just_name = str(Path(search_path).relative_to(search_path)).split('.')[0]
-            makedirs(Path(output_path) / Path(search_path).relative_to(search_path))
-            process_signal_file(search_path, f'{output_path}/{just_name}.cleaned.wav', exist_ok=True)
+            just_name = str(Path(search_path).relative_to(Path(search_path).parent)).split('.')[0]
+            makedirs(Path(output_path) / Path(search_path).relative_to(search_path).parent, exist_ok=True)
+            process_signal_file(search_path, f'{output_path}/{just_name}.cleaned.wav')
             print(f'processed {search_path}')
             continue
         for path in Path(search_path).rglob('*'):
@@ -168,7 +197,7 @@ def main(argv):
             if not path.is_file():
                 continue
             just_name = str(path.relative_to(search_path)).split('.')[0]
-            makedirs(Path(output_path) / Path(path).relative_to(search_path), exist_ok=True)
+            makedirs(Path(output_path) / Path(path).relative_to(search_path).parent, exist_ok=True)
             process_signal_file(path, f'{output_path}/{just_name}.cleaned.wav')
             print(f'processed {path}')
 
