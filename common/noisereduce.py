@@ -72,7 +72,7 @@ def update_pbar(pbar, message):
 
 def _smoothing_filter(n_grad_freq, n_grad_time):
     """Generates a filter to smooth the mask for the spectrogram
-        
+
     Arguments:
         n_grad_freq {[type]} -- [how many frequency channels to smooth over with the mask.]
         n_grad_time {[type]} -- [how many time channels to smooth over with the mask.]
@@ -98,11 +98,11 @@ def _smoothing_filter(n_grad_freq, n_grad_time):
 
 def mask_signal(sig_stft, sig_mask):
     """ Reduces amplitude of time/frequency regions of a spectrogram based upon a mask 
-        
+
     Arguments:
         sig_stft {[type]} -- spectrogram of signal
         sig_mask {[type]} -- mask to apply to signal
-    
+
     Returns:
         sig_stft_amp [type] -- masked signal
     """
@@ -112,11 +112,11 @@ def mask_signal(sig_stft, sig_mask):
 
 def convolve_gaussian(sig_mask, smoothing_filter, use_tensorflow=False):
     """ Convolves a gaussian filter with a mask (or any image)
-    
+
     Arguments:
         sig_mask {[type]} -- The signal mask
         smoothing_filter {[type]} -- the filter to convolve
-    
+
     Keyword Arguments:
         use_tensorflow {bool} -- use tensorflow.signal or scipy.signal (default: {False})
     """
@@ -129,7 +129,8 @@ def convolve_gaussian(sig_mask, smoothing_filter, use_tensorflow=False):
         )
         img = sig_mask[:, :, tf.newaxis, tf.newaxis].astype("float32")
         return (
-            tf.nn.conv2d(img, smoothing_filter, strides=[1, 1, 1, 1], padding="SAME")
+            tf.nn.conv2d(img, smoothing_filter, strides=[
+                         1, 1, 1, 1], padding="SAME")
             .numpy()
             .squeeze()
         )
@@ -140,7 +141,7 @@ def convolve_gaussian(sig_mask, smoothing_filter, use_tensorflow=False):
 def load_tensorflow(verbose=False):
     """loads tensorflow if it is available
     Used as a backend for fft and convolution
-    
+
     Returns:
         bool -- whether to use tensorflow
     """
@@ -149,7 +150,8 @@ def load_tensorflow(verbose=False):
         globals()["tf"] = __import__("tensorflow")
 
         if verbose:
-            available_gpus = tf.config.experimental.list_physical_devices("GPU")
+            available_gpus = tf.config.experimental.list_physical_devices(
+                "GPU")
             print("GPUs available: {}".format(available_gpus))
         if int(tf.__version__[0]) < 2:
             warnings.warn(
@@ -201,7 +203,7 @@ def reduce_noise(
 
     if verbose:
         from tqdm.autonotebook import tqdm
-        pbar = tqdm(total=7) 
+        pbar = tqdm(total=7)
     else:
         pbar = None
 
@@ -250,7 +252,7 @@ def reduce_noise(
 
     update_pbar(pbar, "Apply mask")
     # mask the signal
-    
+
     sig_stft_amp = mask_signal(sig_stft, sig_mask)
     noise_stft_amp = mask_signal(sig_stft, 1-sig_mask)
 
@@ -304,4 +306,4 @@ def reduce_noise(
             sig_mask,
             recovered_spec,
         )
-    return recovered_signal,recovered_noise
+    return recovered_signal, recovered_noise

@@ -102,7 +102,6 @@ def noise_sel(y, sr, noise_threshold: float = None, eliminate_noise_bigger_than_
         # is considered noise.
         noise_threshold = 0.27 * (edBmax - edBmin)
 
-
     # select frames with RMS mean next to the minimum level
     inoise_pre = edB < edBmin + noise_threshold
 
@@ -110,6 +109,7 @@ def noise_sel(y, sr, noise_threshold: float = None, eliminate_noise_bigger_than_
         eliminate_noise_bigger_than_seconds * sr))
 
     return inoise, inoise_pre
+
 
 def cut_noise_from_edges(y, inoise):
     '''
@@ -122,6 +122,7 @@ def cut_noise_from_edges(y, inoise):
 
     return y[first_signal:last_signal]
 
+
 def noise_reduce_signal(y, sr):
     # We can only work with audios longer than 1 second, because
     # we will throw away at least 0.5s off of each side
@@ -132,25 +133,26 @@ def noise_reduce_signal(y, sr):
     noise = y[inoise]
 
     reduced_y, ε = reduce_noise(audio_clip=y,
-                                noise_clip=noise, 
+                                noise_clip=noise,
                                 n_grad_freq=3,
-                                n_grad_time=3, 
-                                n_std_thresh=2, 
-                                prop_decrease=1.0, 
+                                n_grad_time=3,
+                                n_std_thresh=2,
+                                prop_decrease=1.0,
                                 verbose=False)
 
     reduced_y = cut_noise_from_edges(reduced_y, inoise)
 
     # Normalize to [-1, 1]
-    reduced_y /= max(max(y),-min(y),1)
-    ε /= max(max(ε),-min(ε),1)
+    reduced_y /= max(max(y), -min(y), 1)
+    ε /= max(max(ε), -min(ε), 1)
 
     return reduced_y, ε
+
 
 def just_crop_ends(y, sr):
     if len(y) <= sr * 1:
         return y
-    
+
     inoise, _ = noise_sel(y, sr)
     return cut_noise_from_edges(y, inoise)
 
@@ -166,6 +168,7 @@ def process_signal_file(filename, save_to, noise_supress=True):
     except:
         print(f'error processing {filename}, skipping')
 
+
 def main(argv):
     from pathlib import Path
     from os import makedirs
@@ -173,7 +176,8 @@ def main(argv):
     IGNORED_PATHS = ['.DS_Store', '.asd']
 
     if len(argv) < 3:
-        print(f'usage: {argv[0]} <location_to_be_saved> <file/dir> [ <file/dir> ... ]')
+        print(
+            f'usage: {argv[0]} <location_to_be_saved> <file/dir> [ <file/dir> ... ]')
         print(f'Cleans all noise from audio in all file/dirs in the input.')
         return -1
 
@@ -189,9 +193,12 @@ def main(argv):
 
     for search_path in argv[2:]:
         if Path(search_path).is_file():
-            just_name = str(Path(search_path).relative_to(Path(search_path).parent)).split('.')[0]
-            makedirs(Path(output_path) / Path(search_path).relative_to(search_path).parent, exist_ok=True)
-            process_signal_file(search_path, f'{output_path}/{just_name}.cleaned.wav')
+            just_name = str(Path(search_path).relative_to(
+                Path(search_path).parent)).split('.')[0]
+            makedirs(Path(output_path) /
+                     Path(search_path).relative_to(search_path).parent, exist_ok=True)
+            process_signal_file(
+                search_path, f'{output_path}/{just_name}.cleaned.wav')
             print(f'processed {search_path}')
             continue
         for path in Path(search_path).rglob('*'):
@@ -200,11 +207,11 @@ def main(argv):
             if not path.is_file():
                 continue
             just_name = str(path.relative_to(search_path)).split('.')[0]
-            makedirs(Path(output_path) / Path(path).relative_to(search_path).parent, exist_ok=True)
+            makedirs(Path(output_path) /
+                     Path(path).relative_to(search_path).parent, exist_ok=True)
             process_signal_file(path, f'{output_path}/{just_name}.cleaned.wav')
             print(f'processed {path}')
 
-    
 
 if __name__ == '__main__':
     from sys import argv, exit
