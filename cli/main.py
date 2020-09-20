@@ -8,10 +8,11 @@ import ctypes
 import soundfile as sf
 import librosa
 from common.noisereduce import reduce_noise
-
+from pathlib import Path
+from os import makedirs
 
 def load_file(filename):
-    return librosa.load(filename)
+    return librosa.load(filename, sr=None)
 
 
 def preprocess_audio(y, sr):
@@ -157,6 +158,14 @@ def just_crop_ends(y, sr):
     return cut_noise_from_edges(y, inoise)
 
 
+def crop_all_noise(y, sr):
+    if len(y) <= sr * 1:
+        return y
+
+    inoise, _ = noise_sel(y, sr)
+    iaudio = [not i for i in inoise]
+    return y[iaudio]
+
 def process_signal_file(filename, save_to, noise_supress=True):
     try:
         y, sr = load_file(filename)
@@ -167,13 +176,31 @@ def process_signal_file(filename, save_to, noise_supress=True):
         sf.write(save_to, reduced_y, sr)
     except:
         print(f'error processing {filename}, skipping')
+    return filename
 
+def path_iterator(paths, output_path):
+    IGNORED_PATHS = ['.DS_Store', '.asd']
+
+    for search_path in paths:
+        if any(x in str(search_path) for x in IGNORED_PATHS):
+            continue
+
+        if Path(search_path).is_file():
+            just_name = str(Path(search_path).relative_to(
+                Path(search_path).parent)).split('.')[0]
+            makedirs(Path(output_path) /
+                     Path(search_path).relative_to(search_path).parent, exist_ok=True)
+            yield search_path, f'{output_path}/{just_name}.cleaned.wav'
+            continue
+
+        for path in Path(search_path).rglob('*'):
+            generator = path_iterator([path], f'{output_path}/{path.relative_to(search_path).parent}')
+            if generator is not None:
+                yield from generator
 
 def main(argv):
-    from pathlib import Path
-    from os import makedirs
-
-    IGNORED_PATHS = ['.DS_Store', '.asd']
+    from multiprocessing import cpu_count
+    from concurrent.futures import ProcessPoolExecutor
 
     if len(argv) < 3:
         print(
@@ -182,36 +209,22 @@ def main(argv):
         return -1
 
     # I'll make it in a cleaner way afterwards
-    no_noise_supression = False
-    if '--no-noise-supression' in argv:
-        index_of_no_noise_supression_flag = argv.index('--no-noise-supression')
-        no_noise_supression = True
+    no_noise_suppression = False
+    print(argv, '--no-noise-suppression' in argv)
+    if '--no-noise-suppression' in argv:
+        index_of_no_noise_supression_flag = argv.index('--no-noise-suppression')
+        no_noise_suppression = True
+        print('not doing noise suppression')
         argv.pop(index_of_no_noise_supression_flag)
 
     output_path = argv[1].rstrip('/')
     makedirs(output_path, exist_ok=True)
 
-    for search_path in argv[2:]:
-        if Path(search_path).is_file():
-            just_name = str(Path(search_path).relative_to(
-                Path(search_path).parent)).split('.')[0]
-            makedirs(Path(output_path) /
-                     Path(search_path).relative_to(search_path).parent, exist_ok=True)
-            process_signal_file(
-                search_path, f'{output_path}/{just_name}.cleaned.wav')
-            print(f'processed {search_path}')
-            continue
-        for path in Path(search_path).rglob('*'):
-            if any(x in str(path) for x in IGNORED_PATHS):
-                continue
-            if not path.is_file():
-                continue
-            just_name = str(path.relative_to(search_path)).split('.')[0]
-            makedirs(Path(output_path) /
-                     Path(path).relative_to(search_path).parent, exist_ok=True)
-            process_signal_file(path, f'{output_path}/{just_name}.cleaned.wav')
-            print(f'processed {path}')
-
+    with ProcessPoolExecutor(max_workers=2*cpu_count()) as pool:
+        for source_path, dest_path in path_iterator(argv[2:], output_path):
+            bound_source_path = source_path
+            future = pool.submit(process_signal_file, source_path, dest_path, not no_noise_suppression)
+            future.add_done_callback(lambda f: print(f'processed {f.result()}') if f.exception() is None else print(f'error processing {bound_source_path}, exception={f.exception()}'))
 
 if __name__ == '__main__':
     from sys import argv, exit
