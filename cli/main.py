@@ -203,8 +203,7 @@ def main(argv):
     from concurrent.futures import ProcessPoolExecutor
 
     if len(argv) < 3:
-        print(
-            f'usage: {argv[0]} <location_to_be_saved> <file/dir> [ <file/dir> ... ]')
+        print(f'usage: {argv[0]} <location_to_be_saved> <file/dir> [ <file/dir> ... ]')
         print(f'Cleans all noise from audio in all file/dirs in the input.')
         return -1
 
@@ -225,6 +224,7 @@ def main(argv):
             bound_source_path = source_path
             future = pool.submit(process_signal_file, source_path, dest_path, not no_noise_suppression)
             future.add_done_callback(lambda f: print(f'processed {f.result()}') if f.exception() is None else print(f'error processing {bound_source_path}, exception={f.exception()}'))
+    return 0
 
 if __name__ == '__main__':
     from sys import argv, exit
