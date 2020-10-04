@@ -198,34 +198,38 @@ def path_iterator(paths, output_path):
             if generator is not None:
                 yield from generator
 
-def main(argv):
+def main():
     from multiprocessing import cpu_count
     from concurrent.futures import ProcessPoolExecutor
+    from argparse import ArgumentParser
 
-    if len(argv) < 3:
-        print(f'usage: {argv[0]} <location_to_be_saved> <file/dir> [ <file/dir> ... ]')
-        print(f'Cleans all noise from audio in all file/dirs in the input.')
-        return -1
+    parser = ArgumentParser(
+        description='A tool to reduce noise, clip, and mark Praat\'s TextGrids of voice audios.\n' +
+                    'This tool is/was used for the SPIRA project.',
+        usage='%(prog)s [options] DEST_DIR SOURCE_DIR [SOURCE_DIR ...]',
+    )
+    parser.set_defaults(noise_suppress=False, workers=2 * cpu_count())
 
-    # I'll make it in a cleaner way afterwards
-    no_noise_suppression = False
-    print(argv, '--no-noise-suppression' in argv)
-    if '--no-noise-suppression' in argv:
-        index_of_no_noise_supression_flag = argv.index('--no-noise-suppression')
-        no_noise_suppression = True
-        print('not doing noise suppression')
-        argv.pop(index_of_no_noise_supression_flag)
+    parser.add_argument('--version', action='version', version='%(prog)s 1.0.0')
+    parser.add_argument('--noise-suppress', help='activates noise suppression for the audio processing', action='store_true')
+    parser.add_argument('--workers', help='parallelize up to max amount of workers', type=int)
 
-    output_path = argv[1].rstrip('/')
+    parser.add_argument('dest_dir', help='directory to save all processed audio')
+    parser.add_argument('source_dir', help='directories to search for audios to process', nargs='+')
+
+    args = parser.parse_args()
+    return 0
+
+    output_path = args.dest_folder.rstrip('/')
     makedirs(output_path, exist_ok=True)
 
-    with ProcessPoolExecutor(max_workers=2*cpu_count()) as pool:
-        for source_path, dest_path in path_iterator(argv[2:], output_path):
+    with ProcessPoolExecutor(max_workers=args.max_workers) as pool:
+        for source_path, dest_path in path_iterator(args.source_folder, output_path):
             bound_source_path = source_path
-            future = pool.submit(process_signal_file, source_path, dest_path, not no_noise_suppression)
+            future = pool.submit(process_signal_file, source_path, dest_path, args.noise_suppress)
             future.add_done_callback(lambda f: print(f'processed {f.result()}') if f.exception() is None else print(f'error processing {bound_source_path}, exception={f.exception()}'))
     return 0
 
 if __name__ == '__main__':
-    from sys import argv, exit
-    exit(main(argv))
+    from sys import exit
+    exit(main())
