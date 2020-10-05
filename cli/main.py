@@ -7,9 +7,10 @@ import scipy.io.wavfile as wavfile
 import ctypes
 import soundfile as sf
 import librosa
-from common.noisereduce import reduce_noise
 from pathlib import Path
 from os import makedirs
+from common.noisereduce import reduce_noise
+import common.textgrid_writer as textgrid
 
 def load_file(filename):
     return librosa.load(filename, sr=None)
@@ -104,21 +105,21 @@ def noise_sel(y, sr, noise_threshold: float = None, eliminate_noise_bigger_than_
         noise_threshold = 0.27 * (edBmax - edBmin)
 
     # select frames with RMS mean next to the minimum level
-    inoise_pre = edB < edBmin + noise_threshold
+    is_noise_pre = edB < edBmin + noise_threshold
 
-    inoise = boolean_majority_filter(inoise_pre, int(
+    is_noise = boolean_majority_filter(is_noise_pre, int(
         eliminate_noise_bigger_than_seconds * sr))
 
-    return inoise, inoise_pre
+    return is_noise, is_noise_pre
 
 
-def cut_noise_from_edges(y, inoise):
+def cut_noise_from_edges(y, is_noise):
     '''
     Cuts all the noise from the beginning and end of the signal.
     this is made using the indices of inoise.
     '''
     # noise = True, signal = False. It returns rows and columns, we just want the rows.
-    isignal, *_ = np.where(inoise == False)
+    isignal, *_ = np.where(is_noise == False)
     first_signal, last_signal = isignal[0], isignal[-1]
 
     return y[first_signal:last_signal]
@@ -166,13 +167,20 @@ def crop_all_noise(y, sr):
     iaudio = [not i for i in inoise]
     return y[iaudio]
 
-def process_signal_file(filename, save_to, noise_supress=True):
+def process_signal_file(filename, save_to, noise_supress=False, generate_textgrid=False):
     try:
         y, sr = load_file(filename)
         if noise_supress:
             reduced_y, _ = noise_reduce_signal(y, sr)
         else:
             reduced_y = just_crop_ends(y, sr)
+
+        if generate_textgrid:
+            isnoise, _ = noise_sel(reduced_y, sr)
+            inoise = np.where(isnoise == True)[0]
+            tg = textgrid.audio_to_textgrid(reduced_y, sr, inoise)
+            textgrid.write_textgrid_to_file(f'{save_to}.TextGrid', save_to, tg)
+
         sf.write(save_to, reduced_y, sr)
     except:
         print(f'error processing {filename}, skipping')
@@ -208,25 +216,25 @@ def main():
                     'This tool is/was used for the SPIRA project.',
         usage='%(prog)s [options] DEST_DIR SOURCE_DIR [SOURCE_DIR ...]',
     )
-    parser.set_defaults(noise_suppress=False, workers=2 * cpu_count())
+    parser.set_defaults(noise_suppress=False, generate_textgrid=False, workers=2 * cpu_count())
 
     parser.add_argument('--version', action='version', version='%(prog)s 1.0.0')
     parser.add_argument('--noise-suppress', help='activates noise suppression for the audio processing', action='store_true')
+    parser.add_argument('--generate-textgrid', help='generate a noise-signal textgrid for each audio', action='store_true')
     parser.add_argument('--workers', help='parallelize up to max amount of workers', type=int)
 
     parser.add_argument('dest_dir', help='directory to save all processed audio')
     parser.add_argument('source_dir', help='directories to search for audios to process', nargs='+')
 
     args = parser.parse_args()
-    return 0
 
-    output_path = args.dest_folder.rstrip('/')
+    output_path = args.dest_dir.rstrip('/')
     makedirs(output_path, exist_ok=True)
 
-    with ProcessPoolExecutor(max_workers=args.max_workers) as pool:
-        for source_path, dest_path in path_iterator(args.source_folder, output_path):
+    with ProcessPoolExecutor(max_workers=args.workers) as pool:
+        for source_path, dest_path in path_iterator(args.source_dir, output_path):
             bound_source_path = source_path
-            future = pool.submit(process_signal_file, source_path, dest_path, args.noise_suppress)
+            future = pool.submit(process_signal_file, source_path, dest_path, args.noise_suppress, args.generate_textgrid)
             future.add_done_callback(lambda f: print(f'processed {f.result()}') if f.exception() is None else print(f'error processing {bound_source_path}, exception={f.exception()}'))
     return 0
 

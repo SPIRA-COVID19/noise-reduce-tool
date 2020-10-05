@@ -17,6 +17,7 @@ imageio = "*"
 ipywidgets = "*"
 jupyterlab = "*"
 librosa = "*"
+textgrid = "*"
 
 [requires]
 python_version = "3"
