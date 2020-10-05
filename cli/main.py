@@ -168,22 +168,19 @@ def crop_all_noise(y, sr):
     return y[iaudio]
 
 def process_signal_file(filename, save_to, noise_supress=False, generate_textgrid=False):
-    try:
-        y, sr = load_file(filename)
-        if noise_supress:
-            reduced_y, _ = noise_reduce_signal(y, sr)
-        else:
-            reduced_y = just_crop_ends(y, sr)
+    y, sr = load_file(filename)
+    if noise_supress:
+        reduced_y, _ = noise_reduce_signal(y, sr)
+    else:
+        reduced_y = just_crop_ends(y, sr)
 
-        if generate_textgrid:
-            isnoise, _ = noise_sel(reduced_y, sr)
-            inoise = np.where(isnoise == True)[0]
-            tg = textgrid.audio_to_textgrid(reduced_y, sr, inoise)
-            textgrid.write_textgrid_to_file(f'{save_to}.TextGrid', save_to, tg)
+    if generate_textgrid:
+        isnoise, _ = noise_sel(reduced_y, sr)
+        inoise = np.where(isnoise == True)[0]
+        tg = textgrid.audio_to_textgrid(reduced_y, sr, inoise)
+        textgrid.write_textgrid_to_file(f'{save_to}.TextGrid', save_to, tg)
 
-        sf.write(save_to, reduced_y, sr)
-    except:
-        print(f'error processing {filename}, skipping')
+    sf.write(save_to, reduced_y, sr)
     return filename
 
 def path_iterator(paths, output_path):
