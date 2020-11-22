@@ -13,7 +13,9 @@ class NoiseSupressor:
         'noise_threshold_pct': 0.27,
         'bool_filter_window_size': None,
         'std_threshold': 1.5,
-        'suppresion_pct': 1.0
+        'suppresion_pct': 1.0,
+        'noise_suppress': True,
+        'generate_textgrid': False
     }
     
     def __init__(self, **kwargs):
@@ -47,7 +49,17 @@ class NoiseSupressor:
             suppression_pct (1.0):
                 How much of the final audio should be supressed, versus how much of the audio
                 should just remain the dry signal from the input. Ranges from 0 to 1, where
-                0 returns the original audio and 1 returns just the suppressed audio.                
+                0 returns the original audio and 1 returns just the suppressed audio.
+
+
+            Alongside these parameters, you have the following options when processing an audio:
+
+            noise_suppress (True):
+                Choose whether to suppress noise or to just cut preliminary noise from the
+                beginning and ending of an audio.
+
+            generate_textgrid (False):
+                Generate a Praat textgrid containing sections where we detected we have signal/noise.
         """
         self.__dict__ = { **self.__DEFAULTS, **kwargs }
 
@@ -83,15 +95,15 @@ class NoiseSupressor:
         inoise, _ = self.__noise_sel(y, sr)
         return self.__cut_noise_from_edges(y, inoise)
 
-    def process_signal_file(self, filename, save_to, noise_supress=True, generate_textgrid=False):
+    def process_signal_file(self, filename, save_to):
         y, sr = librosa.load(filename)
         y = self.__remove_dc(y)
-        if noise_supress:
+        if self.noise_supress:
             reduced_y, _ = self.noise_reduce_signal(y, sr)
         else:
             reduced_y = self.just_crop_ends(y, sr)
 
-        if generate_textgrid:
+        if self.generate_textgrid:
             isnoise, _ = self.__noise_sel(reduced_y, sr)
             inoise = np.where(isnoise == True)[0]
             tg = audio_to_textgrid(reduced_y, sr, inoise)

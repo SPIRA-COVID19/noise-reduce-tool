@@ -48,12 +48,12 @@ def main():
     output_path = args.dest_dir.rstrip('/')
     makedirs(output_path, exist_ok=True)
 
-    noiseprocessor = NoiseSupressor()
+    noiseprocessor = NoiseSupressor(noise_suppress=args.noise_suppress, generate_textgrid=args.generate_textgrid)
 
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         for source_path, dest_path in path_iterator(args.source_dir, output_path):
             bound_source_path = source_path
-            future = pool.submit(noiseprocessor.process_signal_file, bound_source_path, dest_path, args.noise_suppress, args.generate_textgrid)
+            future = pool.submit(noiseprocessor.process_signal_file, bound_source_path, dest_path)
             future.add_done_callback(lambda f: print(f'processed {f.result()}') if f.exception() is None else print(f'error processing {bound_source_path}, exception={f.exception()}'))
     return 0
 
