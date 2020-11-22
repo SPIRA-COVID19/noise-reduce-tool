@@ -27,7 +27,7 @@ def audio_to_textgrid(y, sr, inoise) -> textgrid.TextGrid:
     '''
     max_time = len(y) / sr
     tg = textgrid.TextGrid(maxTime=max_time)
-    tier = textgrid.IntervalTier(name='silêncio', maxTime=max_time)
+    tier = textgrid.IntervalTier(name='', maxTime=max_time)
 
     intervals = __separate_intervals(y, inoise)
     for is_signal, imin, imax in intervals:
