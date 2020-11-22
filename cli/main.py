@@ -1,27 +1,4 @@
-from pathlib import Path
-from os import makedirs
-
-from common.noise_supressor import NoiseSupressor
-
-def path_iterator(paths, output_path):
-    IGNORED_PATHS = ['.DS_Store', '.asd']
-
-    for search_path in paths:
-        if any(x in str(search_path) for x in IGNORED_PATHS):
-            continue
-
-        if Path(search_path).is_file():
-            just_name = str(Path(search_path).relative_to(
-                Path(search_path).parent)).split('.')[0]
-            makedirs(Path(output_path) /
-                     Path(search_path).relative_to(search_path).parent, exist_ok=True)
-            yield search_path, f'{output_path}/{just_name}.cleaned.wav'
-            continue
-
-        for path in Path(search_path).rglob('*'):
-            generator = path_iterator([path], f'{output_path}/{path.relative_to(search_path).parent}')
-            if generator is not None:
-                yield from generator
+from common import NoiseSupressor, process_directory
 
 def main():
     from multiprocessing import cpu_count
@@ -46,15 +23,9 @@ def main():
     args = parser.parse_args()
 
     output_path = args.dest_dir.rstrip('/')
-    makedirs(output_path, exist_ok=True)
-
     noiseprocessor = NoiseSupressor(noise_suppress=args.noise_suppress, generate_textgrid=args.generate_textgrid)
 
-    with ProcessPoolExecutor(max_workers=args.workers) as pool:
-        for source_path, dest_path in path_iterator(args.source_dir, output_path):
-            bound_source_path = source_path
-            future = pool.submit(noiseprocessor.process_signal_file, bound_source_path, dest_path)
-            future.add_done_callback(lambda f: print(f'processed {f.result()}') if f.exception() is None else print(f'error processing {bound_source_path}, exception={f.exception()}'))
+    process_directory(args.source_dir, output_path, noiseprocessor)
     return 0
 
 if __name__ == '__main__':

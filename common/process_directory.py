@@ -1,4 +1,6 @@
 from multiprocessing import cpu_count
+from os import makedirs
+from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 from argparse import ArgumentParser
 from functools import partial
@@ -54,10 +56,10 @@ def process_directory(in_dir: str, out_dir: str, noise_supressor: NoiseSupressor
         paths_to_ignore:
             list of paths or substrings to ignore when crawling to a directory. Example: ['log', '.avi', '.gitignore']
     """
-    makedirs(output_path, exist_ok=True)
+    makedirs(out_dir, exist_ok=True)
 
     with ProcessPoolExecutor(max_workers=cpu_count()) as pool:
-        for source_path, dest_path in path_iterator(in_dir, out_dir):
+        for source_path, dest_path in path_iterator(in_dir, out_dir, paths_to_ignore):
             bound_callback = partial(on_processed_callback, source_path)
             future = pool.submit(noise_supressor.process_signal_file, source_path, dest_path)
             future.add_done_callback(bound_callback)

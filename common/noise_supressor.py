@@ -98,7 +98,7 @@ class NoiseSupressor:
     def process_signal_file(self, filename, save_to):
         y, sr = librosa.load(filename)
         y = self.__remove_dc(y)
-        if self.noise_supress:
+        if self.noise_suppress:
             reduced_y, _ = self.noise_reduce_signal(y, sr)
         else:
             reduced_y = self.just_crop_ends(y, sr)
