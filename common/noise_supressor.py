@@ -76,7 +76,7 @@ class NoiseSupressor:
                                     noise_clip=noise,
                                     n_grad_freq=2,
                                     n_grad_time=4,
-                                    n_std_thresh=self.std_treshold,
+                                    n_std_thresh=self.std_threshold,
                                     prop_decrease=self.suppresion_pct,
                                     verbose=False)
 
