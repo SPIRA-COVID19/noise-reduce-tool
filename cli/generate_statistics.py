@@ -36,7 +36,7 @@ class Statistics:
     signal_length_stddev: float
 
 def generate_statistics_of_audio(noise_suppressor: NoiseSuppressor, source_file, _dest_file) -> Statistics:
-    raw_y, sr = librosa.load(source_file)
+    raw_y, sr = librosa.load(source_file, sr=44100)
 
     y = noise_suppressor.just_crop_ends(raw_y, sr)
     if len(y) <= sr * 1:

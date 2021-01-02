@@ -96,7 +96,7 @@ class NoiseSuppressor:
         return self.__cut_noise_from_edges(y, inoise)
 
     def process_signal_file(self, filename, save_to):
-        y, sr = librosa.load(filename)
+        y, sr = librosa.load(filename, sr=44100)
         y = self.__remove_dc(y)
         if self.noise_suppress:
             reduced_y, _ = self.noise_reduce_signal(y, sr)
