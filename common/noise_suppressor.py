@@ -6,11 +6,11 @@ from .noisereduce import reduce_noise
 from .textgrid_writer import audio_to_textgrid, write_textgrid_to_file
 
 
-class NoiseSupressor:
+class NoiseSuppressor:
 
     __DEFAULTS = {
         'noise_threshold_db': None,
-        'noise_threshold_pct': 0.27,
+        'noise_threshold_pct': 0.34,
         'bool_filter_window_size': None,
         'std_threshold': 1.5,
         'suppresion_pct': 1.0,
@@ -69,13 +69,13 @@ class NoiseSupressor:
         if len(y) <= sr * 1:
             return y, np.zeros(len(y))
 
-        inoise, _ = self.__noise_sel(y, sr)
+        inoise, _ = self.noise_sel(y, sr)
         noise = y[inoise]
 
         reduced_y, ε = reduce_noise(audio_clip=y,
                                     noise_clip=noise,
-                                    n_grad_freq=2,
-                                    n_grad_time=4,
+                                    n_grad_freq=4,
+                                    n_grad_time=8,
                                     n_std_thresh=self.std_threshold,
                                     prop_decrease=self.suppresion_pct,
                                     verbose=False)
@@ -92,7 +92,7 @@ class NoiseSupressor:
         if len(y) <= sr * 1:
             return y
 
-        inoise, _ = self.__noise_sel(y, sr)
+        inoise, _ = self.noise_sel(y, sr)
         return self.__cut_noise_from_edges(y, inoise)
 
     def process_signal_file(self, filename, save_to):
@@ -104,7 +104,7 @@ class NoiseSupressor:
             reduced_y = self.just_crop_ends(y, sr)
 
         if self.generate_textgrid:
-            isnoise, _ = self.__noise_sel(reduced_y, sr)
+            isnoise, _ = self.noise_sel(reduced_y, sr)
             inoise = np.where(isnoise == True)[0]
             tg = audio_to_textgrid(reduced_y, sr, inoise)
             write_textgrid_to_file(f'{save_to}.TextGrid', save_to, tg)
@@ -196,7 +196,7 @@ class NoiseSupressor:
 
         return y[first_signal:last_signal]
     
-    def __noise_sel(self, y, sr, noise_threshold: float = None, eliminate_noise_bigger_than_seconds: float = 0.2):
+    def noise_sel(self, y, sr, noise_threshold: float = None, eliminate_noise_bigger_than_seconds: float = 0.2):
         edB, edBmin, edBmax = self.__sliding_window_energy(y, sr)
 
         noise_threshold = self.noise_threshold_db

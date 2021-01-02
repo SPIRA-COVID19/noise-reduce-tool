@@ -2,8 +2,11 @@ import numpy as np
 from dataclasses import dataclass, fields, asdict
 from pathlib import Path
 import librosa
+from concurrent.futures import Future, wait
+from functools import partial
+import sys
 
-import main as cli_main
+from common import process_directory_raw, NoiseSuppressor
 
 def count_sizes(is_noise):
     '''
@@ -32,42 +35,25 @@ class Statistics:
     signal_length_avg: float
     signal_length_stddev: float
 
-def generate_statistics_of_audio(filename, source_file) -> Statistics:
-    raw_y, sr = cli_main.load_file(source_file)
+def generate_statistics_of_audio(noise_suppressor: NoiseSuppressor, source_file, _dest_file) -> Statistics:
+    raw_y, sr = librosa.load(source_file)
 
-    y = cli_main.just_crop_ends(raw_y, sr)
+    y = noise_suppressor.just_crop_ends(raw_y, sr)
     if len(y) <= sr * 1:
-        return None
+        raise Exception('Length of audio is too small to be analyzed')
 
-    is_noise, _ = cli_main.noise_sel(y, sr)
+    is_noise, _ = noise_suppressor.noise_sel(y, sr)
     ynoise = y[is_noise]
     signal_sizes = count_sizes(is_noise)
 
     return Statistics(
-        filename = filename,
+        filename = source_file,
         noise_ratio = len(ynoise) / len(y),
         noise_voice_ratio = len(ynoise) / (len(y) - len(ynoise)),
         amount_of_skips = len(signal_sizes) - 1,
         signal_length_avg = np.average(signal_sizes) / sr,
         signal_length_stddev = np.std(signal_sizes) / sr,
     )
-
-def path_iterator(paths):
-    IGNORED_PATHS = ['.DS_Store', '.asd']
-
-    for search_path in paths:
-        if any(x in str(search_path) for x in IGNORED_PATHS):
-            continue
-
-        if Path(search_path).is_file():
-            just_name = str(Path(search_path).relative_to(Path(search_path).parent)).lstrip('./')
-            yield search_path, just_name
-            continue
-
-        for path in Path(search_path).rglob('*'):
-            generator = path_iterator([path])
-            if generator is not None:
-                yield from generator
 
 def main(argv):
     import csv
@@ -83,14 +69,16 @@ def main(argv):
     writer = csv.DictWriter(stdout, fieldnames=[field.name for field in fields(Statistics)])
     writer.writeheader()
 
-    def completed_action(future):
-        if future.result() is not None:
-            writer.writerow(asdict(future.result()))
+    def completed_action(file_path: str, future: Future):
+        if future.exception() is not None:
+            print(f'error processing file {file_path}: {future.exception()}', file=sys.stderr)
+            return
+        writer.writerow(asdict(future.result()))
 
-    with ProcessPoolExecutor(max_workers=2*cpu_count()) as pool:
-        for source_path, filename in path_iterator(argv[1:]):
-            future = pool.submit(generate_statistics_of_audio, filename, source_path)
-            future.add_done_callback(completed_action)
+    noise_suppressor = NoiseSuppressor(noise_suppress=False)
+
+    futures = process_directory_raw(argv[1:], None, partial(generate_statistics_of_audio, noise_suppressor), completed_action, ['.DS_Store', '.asd'])
+    wait(futures)
 
     return 0
 

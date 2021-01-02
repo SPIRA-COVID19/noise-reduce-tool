@@ -169,8 +169,8 @@ def load_tensorflow(verbose=False):
 def reduce_noise(
     audio_clip,
     noise_clip,
-    n_grad_freq=2,
-    n_grad_time=4,
+    n_grad_freq=4,
+    n_grad_time=8,
     n_fft=2048,
     win_length=2048,
     hop_length=512,
@@ -186,9 +186,9 @@ def reduce_noise(
         noise_clip (array): The second parameter.
         n_grad_freq (int): how many frequency channels to smooth over with the mask.
         n_grad_time (int): how many time channels to smooth over with the mask.
-        n_fft (int): number audio of frames between STFT columns.
+        n_fft (int): number of audio frames in STFT columns.
         win_length (int): Each frame of audio is windowed by `window()`. The window will be of length `win_length` and then padded with zeros to match `n_fft`..
-        hop_length (int):number audio of frames between STFT columns.
+        hop_length (int): number of audio frames between STFT columns.
         n_std_thresh (int): how many standard deviations louder than the mean dB of the noise (at each frequency level) to be considered signal
         prop_decrease (float): To what extent should you decrease noise (1 = all, 0 = none)
         pad_clipping (bool): Pad the signals with zeros to ensure that the reconstructed data is equal length to the data
