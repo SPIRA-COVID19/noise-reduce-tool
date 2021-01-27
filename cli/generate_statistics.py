@@ -5,8 +5,7 @@ import librosa
 from concurrent.futures import Future, wait
 from functools import partial
 import sys
-
-from common import process_directory_raw, NoiseSuppressor
+from common import process_directory_raw, NoiseSuppressor, F0StatisticsExtractor
 
 def count_sizes(is_noise):
     '''
@@ -34,6 +33,12 @@ class Statistics:
     amount_of_skips: int
     signal_length_avg: float
     signal_length_stddev: float
+    f0median: float
+    f0mean: float
+    f0stddev: float
+    f0min: float
+    f0max: float
+
 
 def generate_statistics_of_audio(noise_suppressor: NoiseSuppressor, source_file, _dest_file) -> Statistics:
     raw_y, sr = librosa.load(source_file, sr=44100)
@@ -41,6 +46,9 @@ def generate_statistics_of_audio(noise_suppressor: NoiseSuppressor, source_file,
     y = noise_suppressor.just_crop_ends(raw_y, sr)
     if len(y) <= sr * 1:
         raise Exception('Length of audio is too small to be analyzed')
+
+    f0_stats_extractor = F0StatisticsExtractor(**noise_suppressor.__dict__)
+    f0stats = f0_stats_extractor.generate_f0_statistics(raw_y, sr)
 
     is_noise, _ = noise_suppressor.noise_sel(y, sr)
     ynoise = y[is_noise]
@@ -53,6 +61,11 @@ def generate_statistics_of_audio(noise_suppressor: NoiseSuppressor, source_file,
         amount_of_skips = len(signal_sizes) - 1,
         signal_length_avg = np.average(signal_sizes) / sr,
         signal_length_stddev = np.std(signal_sizes) / sr,
+        f0median = f0stats.median,
+        f0mean = f0stats.mean,
+        f0stddev = f0stats.std,
+        f0min = f0stats.min,
+        f0max = f0stats.max,
     )
 
 def main(argv):
